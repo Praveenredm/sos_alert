@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency SOS - Sender</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        .emergency-type { transition: transform 0.3s ease; }
+        .emergency-type:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="bg-gradient-to-r from-blue-100 to-blue-200 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-96">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">
+            <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>Emergency SOS
+        </h1>
+        
+        <div id="sosForm" class="space-y-4">
+            <input type="text" id="nameInput" placeholder="Your Name" 
+                   class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            
+            <input type="text" id="locationInput" placeholder="Fetching location..." readonly
+                   class="w-full p-3 border rounded-lg bg-gray-100 focus:outline-none">
+            
+            <button type="button" onclick="getLocation()" 
+                    class="w-full bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition">
+                Set Current Location
+            </button>
+            
+            <div class="grid grid-cols-3 gap-4">
+                <button type="button" data-type="Medical" 
+                        class="emergency-type bg-red-500 text-white p-4 rounded-lg hover:bg-red-600 flex flex-col items-center">
+                    <i class="fas fa-briefcase-medical text-2xl mb-2"></i>
+                    Medical
+                </button>
+                <button type="button" data-type="Help" 
+                        class="emergency-type bg-orange-500 text-white p-4 rounded-lg hover:bg-orange-600 flex flex-col items-center">
+                    <i class="fas fa-hands-helping text-2xl mb-2"></i>
+                    Help
+                </button>
+                <button type="button" data-type="Food" 
+                        class="emergency-type bg-blue-500 text-white p-4 rounded-lg hover:bg-blue-600 flex flex-col items-center">
+                    <i class="fas fa-utensils text-2xl mb-2"></i>
+                    Food
+                </button>
+            </div>
+            
+            <!-- Success Message -->
+            <div id="successPopup" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded text-center">
+                <strong>SOS Sent Successfully!</strong> Help is on the way.
+            </div>
+            
+            <!-- Error Message -->
+            <div id="errorPopup" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-center">
+                <strong>Error!</strong> <span id="errorMessage">Something went wrong.</span>
+            </div>
+            
+            <button onclick="sendSOS()" 
+                    class="w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                Send SOS
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedType = null;
+        
+        document.querySelectorAll('[data-type]').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('ring-4'));
+                this.classList.add('ring-4');
+                selectedType = this.getAttribute('data-type');
+            });
+        });
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    document.getElementById('locationInput').value = `${position.coords.latitude}, ${position.coords.longitude}`;
+                }, error => {
+                    alert("Location access denied or unavailable");
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        function sendSOS() {
+            const name = document.getElementById('nameInput').value;
+            const location = document.getElementById('locationInput').value;
+
+            if (!name || !selectedType || !location) {
+                showMessage("error", "Please enter name, select an emergency type, and set location.");
+                return;
+            }
+
+            fetch('http://127.0.0.1:5000/send_sos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    type: selectedType,
+                    latitude: location.split(', ')[0],
+                    longitude: location.split(', ')[1]
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showMessage("success", "SOS Sent Successfully!");
+                } else {
+                    showMessage("error", "Failed to send SOS.");
+                }
+            })
+            .catch(error => {
+                showMessage("error", "Network error. Please try again.");
+            });
+        }
+
+        function showMessage(type, message) {
+            const successPopup = document.getElementById("successPopup");
+            const errorPopup = document.getElementById("errorPopup");
+            const errorMessage = document.getElementById("errorMessage");
+
+            if (type === "success") {
+                successPopup.classList.remove("hidden");
+                errorPopup.classList.add("hidden");
+            } else {
+                errorMessage.innerText = message;
+                errorPopup.classList.remove("hidden");
+                successPopup.classList.add("hidden");
+            }
+
+            // Hide message after 3 seconds
+            setTimeout(() => {
+                successPopup.classList.add("hidden");
+                errorPopup.classList.add("hidden");
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

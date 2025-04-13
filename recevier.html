@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency SOS - Receiver</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-r from-blue-100 to-blue-200 min-h-screen p-8">
+    <div class="container mx-auto">
+        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">
+            <i class="fas fa-satellite-dish text-red-500 mr-2"></i>Emergency SOS Requests
+        </h1>
+        
+        <div id="sosContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div id="noRequestsMessage" class="col-span-full text-center text-gray-600">
+                No active SOS requests
+            </div>
+        </div>
+
+        <div id="errorPopup" class="hidden fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span id="errorMessage" class="block sm:inline">Something went wrong.</span>
+        </div>
+    </div>
+
+    <script>
+        const sosContainer = document.getElementById('sosContainer');
+        const noRequestsMessage = document.getElementById('noRequestsMessage');
+        const errorPopup = document.getElementById('errorPopup');
+        const errorMessage = document.getElementById('errorMessage');
+
+        function showErrorPopup(message) {
+            errorMessage.textContent = message;
+            errorPopup.classList.remove('hidden');
+            setTimeout(() => {
+                errorPopup.classList.add('hidden');
+            }, 3000);
+        }
+
+        function fetchSOSRequests() {
+            fetch('http://127.0.0.1:5000/get_sos')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(requests => {
+                    sosContainer.innerHTML = '';
+
+                    noRequestsMessage.style.display = requests.length === 0 ? 'block' : 'none';
+
+                    requests.forEach(request => {
+                        const card = document.createElement('div');
+                        card.className = 'bg-white rounded-xl shadow-lg p-6 relative';
+
+                        const mapLink = request.latitude !== "N/A" && request.longitude !== "N/A" 
+                            ? `<a href="https://maps.google.com?q=${request.latitude},${request.longitude}" 
+                                target="_blank" class="text-blue-500 hover:underline">
+                                <i class="fas fa-map-marker-alt mr-2"></i>View Location</a>`
+                            : `<p class="text-gray-500">Location Not Available</p>`;
+
+                        card.innerHTML = `
+                            <div class="absolute top-2 right-2 text-sm font-bold text-gray-600">
+                                ${new Date(request.timestamp).toLocaleString()}
+                            </div>
+                            <h2 class="text-2xl font-bold mb-4 ${
+                                request.type === 'Medical' ? 'text-red-600' : 
+                                request.type === 'Help' ? 'text-orange-600' : 
+                                'text-blue-600'
+                            }">
+                                <i class="${
+                                    request.type === 'Medical' ? 'fas fa-briefcase-medical' : 
+                                    request.type === 'Help' ? 'fas fa-hands-helping' : 
+                                    'fas fa-utensils'
+                                } mr-2"></i>${request.type} Emergency
+                            </h2>
+                            <p class="mb-2"><strong>Name:</strong> ${request.name}</p>
+                            ${mapLink}
+                            <button onclick="resolveSOSRequest('${request.id}')" 
+                                    class="w-full bg-green-500 text-white p-3 rounded-lg hover:bg-green-600 transition">
+                                Mark as Resolved
+                            </button>
+                        `;
+                        sosContainer.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showErrorPopup('Failed to fetch SOS requests');
+                });
+        }
+
+        function resolveSOSRequest(sosId) {
+            fetch('http://127.0.0.1:5000/resolve_sos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sos_id: sosId })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(() => {
+                fetchSOSRequests();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorPopup('Failed to resolve SOS request');
+            });
+        }
+
+        fetchSOSRequests();
+        setInterval(fetchSOSRequests, 5000);
+    </script>
+</body>
+</html>
